@@ -89,6 +89,11 @@
       background: #eee;
       position: relative;
     }
+    #viewer canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -165,75 +170,119 @@
 
     emailjs.init('TU_USER_ID_EMAILJS'); // Cambia aquí con tu user ID EmailJS
 
-    // Variables del formulario orden
-    const form = document.getElementById('ordenForm');
-    const dicomFilesInput = document.getElementById('dicomFiles');
-    const stlFileOrden = document.getElementById('stlFileOrden');
-
-    // Variables del visor STL (pestaña STL)
+    // Variables del visor STL
     const stlFileInput = document.getElementById('stlFile');
     const viewer = document.getElementById('viewer');
-
-    // Función para cargar y mostrar STL con Three.js (igual que antes)
+    
+    // Variables para Three.js
+    let scene, camera, renderer, mesh, animationId;
+    
+    // Inicializar Three.js
+    function initThreeJS() {
+      // Limpiar cualquier animación previa
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+      
+      // Limpiar el contenedor
+      viewer.innerHTML = '';
+      
+      // Crear escena
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xeeeeee);
+      
+      // Crear cámara
+      camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / 500, 0.1, 1000);
+      camera.position.z = 5;
+      
+      // Crear renderizador
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(viewer.clientWidth, 500);
+      viewer.appendChild(renderer.domElement);
+      
+      // Añadir luces
+      const ambientLight = new THREE.AmbientLight(0x404040, 2);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(1, 1, 1).normalize();
+      scene.add(directionalLight);
+      
+      // Manejar redimensionamiento
+      window.addEventListener('resize', () => {
+        camera.aspect = viewer.clientWidth / 500;
+        camera.updateProjectionMatrix();
+        renderer.setSize(viewer.clientWidth, 500);
+      });
+    }
+    
+    // Función para cargar y mostrar STL
     function cargarSTL(file) {
       const reader = new FileReader();
-      reader.onload = function (e) {
-        viewer.innerHTML = '';
-
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / 500, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(viewer.clientWidth, 500);
-        viewer.appendChild(renderer.domElement);
-
+      
+      reader.onload = function(e) {
+        initThreeJS(); // Reiniciar la escena
+        
         const loader = new THREE.STLLoader();
         const geometry = loader.parse(e.target.result);
-
+        
+        // Calcular centro y dimensiones
         geometry.computeBoundingBox();
         const bbox = geometry.boundingBox;
-        const centerX = (bbox.max.x + bbox.min.x) / 2;
-        const centerY = (bbox.max.y + bbox.min.y) / 2;
-        const centerZ = (bbox.max.z + bbox.min.z) / 2;
-        geometry.translate(-centerX, -centerY, -centerZ);
-
-        const material = new THREE.MeshNormalMaterial();
-        const mesh = new THREE.Mesh(geometry, material);
+        const center = new THREE.Vector3();
+        bbox.getCenter(center);
+        geometry.translate(-center.x, -center.y, -center.z);
+        
+        // Crear malla
+        const material = new THREE.MeshPhongMaterial({
+          color: 0x00aaff,
+          specular: 0x111111,
+          shininess: 50,
+          side: THREE.DoubleSide
+        });
+        
+        mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);
-
-        const ambientLight = new THREE.AmbientLight(0x404040, 2);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(0, 0, 1).normalize();
-        scene.add(directionalLight);
-
+        
+        // Ajustar cámara
         const maxDim = Math.max(
           bbox.max.x - bbox.min.x,
           bbox.max.y - bbox.min.y,
           bbox.max.z - bbox.min.z
         );
-        camera.position.set(0, 0, maxDim * 2);
-        camera.lookAt(0, 0, 0);
-
+        camera.position.z = maxDim * 1.5;
+        
+        // Animación
         function animate() {
-          requestAnimationFrame(animate);
-          mesh.rotation.y += 0.01;
+          animationId = requestAnimationFrame(animate);
+          if (mesh) mesh.rotation.y += 0.01;
           renderer.render(scene, camera);
         }
         animate();
       };
+      
+      reader.onerror = function(error) {
+        console.error('Error al leer el archivo:', error);
+        viewer.innerHTML = 'Error al cargar el archivo STL.';
+      };
+      
       reader.readAsArrayBuffer(file);
     }
 
-    // Evento para visor STL en pestaña STL
-    stlFileInput.addEventListener('change', () => {
-      const file = stlFileInput.files[0];
+    // Evento para visor STL
+    stlFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
       if (file) {
         cargarSTL(file);
       } else {
         viewer.innerHTML = 'Carga un archivo STL para ver el modelo aquí.';
       }
     });
+
+    // Variables del formulario orden
+    const form = document.getElementById('ordenForm');
+    const dicomFilesInput = document.getElementById('dicomFiles');
+    const stlFileOrden = document.getElementById('stlFileOrden');
 
     // Envío del formulario con EmailJS
     form.addEventListener('submit', (e) => {
@@ -264,6 +313,9 @@
           alert('Error al enviar: ' + err);
         });
     });
+    
+    // Inicializar Three.js al cargar la página
+    initThreeJS();
   </script>
 </body>
 </html>

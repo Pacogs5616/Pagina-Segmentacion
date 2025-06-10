@@ -87,13 +87,6 @@
       border: 1px solid #ccc;
       border-radius: 6px;
     }
-    #stlSelect {
-      margin-top: 1em;
-      font-size: 1em;
-      padding: 0.3em;
-      width: 100%;
-      max-width: 400px;
-    }
   </style>
 </head>
 <body>
@@ -122,15 +115,23 @@
       <label for="descripcion">Descripción del proyecto:</label>
       <textarea id="descripcion" name="descripcion" rows="4" required></textarea>
 
-      <label for="fileInput">Subir Carpeta de Archivos STL:</label>
+      <label for="dicomFiles">Sube carpeta con archivos DICOM:</label>
       <input
         type="file"
-        id="fileInput"
-        name="files"
+        id="dicomFiles"
+        name="dicomFiles"
         webkitdirectory
         directory
         multiple
         required
+        accept=".dcm"
+      />
+
+      <label for="stlFile">Sube un archivo STL para visualizar:</label>
+      <input
+        type="file"
+        id="stlFile"
+        name="stlFile"
         accept=".stl"
       />
 
@@ -138,8 +139,7 @@
     </form>
 
     <h3>Visor STL</h3>
-    <select id="stlSelect"></select>
-    <div id="viewer"></div>
+    <div id="viewer">Carga un archivo STL para ver el modelo aquí.</div>
   </section>
 
   <!-- Librerías necesarias -->
@@ -148,65 +148,30 @@
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
   <script>
-    // Mostrar secciones
     function mostrarSeccion(id) {
       document.querySelectorAll('section').forEach((sec) => sec.classList.remove('active'));
       document.getElementById(id).classList.add('active');
     }
 
-    // Inicializar EmailJS: cambia TU_USER_ID_EMAILJS por tu user ID real
-    emailjs.init('TU_USER_ID_EMAILJS');
+    emailjs.init('TU_USER_ID_EMAILJS'); // Cambia aquí con tu user ID EmailJS
 
     const form = document.getElementById('ordenForm');
-    const fileInput = document.getElementById('fileInput');
-    const stlSelect = document.getElementById('stlSelect');
+    const dicomFilesInput = document.getElementById('dicomFiles');
+    const stlFileInput = document.getElementById('stlFile');
     const viewer = document.getElementById('viewer');
-
-    let fileMap = {};
-
-    // Al cambiar archivos seleccionados
-    fileInput.addEventListener('change', () => {
-      fileMap = {};
-      stlSelect.innerHTML = '';
-      Array.from(fileInput.files).forEach((file) => {
-        if (file.name.toLowerCase().endsWith('.stl')) {
-          fileMap[file.name] = file;
-          const option = document.createElement('option');
-          option.value = file.name;
-          option.textContent = file.name;
-          stlSelect.appendChild(option);
-        }
-      });
-      if (stlSelect.options.length > 0) {
-        cargarSTL(fileMap[stlSelect.value]);
-      } else {
-        viewer.innerHTML = '';
-      }
-    });
-
-    stlSelect.addEventListener('change', () => {
-      const selectedFile = fileMap[stlSelect.value];
-      if (selectedFile) cargarSTL(selectedFile);
-    });
 
     // Función para cargar y mostrar STL con Three.js
     function cargarSTL(file) {
       const reader = new FileReader();
       reader.onload = function (e) {
-        // Limpio renderer viejo si existe
-        if (viewer.renderer) {
-          viewer.renderer.dispose();
-          viewer.innerHTML = '';
-        }
+        // Limpiar contenido previo
+        viewer.innerHTML = '';
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / 500, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(viewer.clientWidth, 500);
-        viewer.innerHTML = '';
         viewer.appendChild(renderer.domElement);
-
-        viewer.renderer = renderer; // para limpieza después
 
         const loader = new THREE.STLLoader();
         const geometry = loader.parse(e.target.result);
@@ -214,7 +179,6 @@
         const mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);
 
-        // Luz
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(0, 0, 1).normalize();
         scene.add(light);
@@ -231,30 +195,42 @@
       reader.readAsArrayBuffer(file);
     }
 
+    // Cuando cambie el archivo STL, cargar en el viewer
+    stlFileInput.addEventListener('change', () => {
+      const file = stlFileInput.files[0];
+      if (file) {
+        cargarSTL(file);
+      } else {
+        viewer.innerHTML = 'Carga un archivo STL para ver el modelo aquí.';
+      }
+    });
+
     // Envío formulario con EmailJS
     form.addEventListener('submit', (e) => {
       e.preventDefault();
 
       const data = new FormData(form);
 
-      // Lista los nombres de archivos seleccionados
-      const archivos = Array.from(fileInput.files).map((f) => f.name).join(', ');
+      // Archivos DICOM subidos (solo los nombres)
+      const dicomNames = Array.from(dicomFilesInput.files).map(f => f.name).join(', ');
 
-      // Parámetros para plantilla de EmailJS
+      // Archivo STL subido (nombre)
+      const stlName = stlFileInput.files[0]?.name || 'No se subió STL';
+
+      // Parámetros para plantilla EmailJS
       const templateParams = {
         nombre: data.get('nombre'),
         email: data.get('email'),
         descripcion: data.get('descripcion'),
-        archivos: archivos,
+        archivosDICOM: dicomNames,
+        archivoSTL: stlName,
       };
 
-      emailjs
-        .send('TU_SERVICE_ID', 'TU_TEMPLATE_ID', templateParams)
+      emailjs.send('TU_SERVICE_ID', 'TU_TEMPLATE_ID', templateParams)
         .then(() => {
           alert('¡Orden enviada correctamente!');
           form.reset();
-          stlSelect.innerHTML = '';
-          viewer.innerHTML = '';
+          viewer.innerHTML = 'Carga un archivo STL para ver el modelo aquí.';
         })
         .catch((err) => {
           alert('Error al enviar: ' + err);

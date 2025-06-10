@@ -1,334 +1,122 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visor 3D y Formulario de Orden</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0; padding: 0;
-      background: #f0f0f0;
-    }
-    header {
-      background: #222;
-      color: white;
-      padding: 1em;
-      text-align: center;
-    }
-    nav {
-      background: #444;
-      display: flex;
-      justify-content: center;
-      gap: 1.5em;
-      padding: 1em 0;
-    }
-    nav button {
-      background: #666;
-      color: white;
-      border: none;
-      padding: 0.6em 1.2em;
-      font-size: 1em;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: background 0.3s;
-    }
-    nav button:hover {
-      background: #888;
-    }
-    section {
-      max-width: 900px;
-      margin: 2em auto;
-      background: white;
-      padding: 1.5em 2em;
-      border-radius: 6px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      display: none;
-    }
-    section.active {
-      display: block;
-    }
-    form label {
-      display: block;
-      margin-top: 1em;
-      font-weight: bold;
-    }
-    form input[type="text"],
-    form input[type="email"],
-    form textarea {
-      width: 100%;
-      padding: 0.5em;
-      margin-top: 0.3em;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1em;
-    }
-    form input[type="file"] {
-      margin-top: 0.5em;
-    }
-    form input[type="submit"] {
-      margin-top: 1.5em;
-      background: #222;
-      color: white;
-      border: none;
-      padding: 0.7em 1.4em;
-      font-size: 1.1em;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-    form input[type="submit"]:hover {
-      background: #444;
-    }
-    #viewer {
-      width: 100%;
-      height: 500px;
-      margin-top: 1em;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      background: #eee;
-      position: relative;
-    }
-    #viewer canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 1.2em;
-      color: #333;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Visor 3D y Formulario de Orden</h1>
-  </header>
-  <nav>
-    <button onclick="mostrarSeccion('inicio')">Inicio</button>
-    <button onclick="mostrarSeccion('orden')">Crear una Orden</button>
-    <button onclick="mostrarSeccion('stlviewer')">Visor STL</button>
-  </nav>
+<script>
+  // Variables globales para Three.js
+  let scene, camera, renderer, mesh, animationId;
+  const viewer = document.getElementById('viewer');
+  const loadingMessage = viewer.querySelector('.loading');
 
-  <section id="inicio" class="active">
-    <h2>Bienvenido</h2>
-    <p>Haz clic en "Crear una Orden" para comenzar o en "Visor STL" para ver modelos 3D.</p>
-  </section>
-
-  <section id="orden">
-    <h2>Formulario de Orden</h2>
-    <form id="ordenForm">
-      <label for="nombre">Nombre:</label>
-      <input type="text" id="nombre" name="nombre" required />
-
-      <label for="email">Email:</label>
-      <input type="email" id="email" name="email" required />
-
-      <label for="descripcion">Descripción del proyecto:</label>
-      <textarea id="descripcion" name="descripcion" rows="4" required></textarea>
-
-      <label for="dicomFiles">Sube carpeta con archivos DICOM:</label>
-      <input
-        type="file"
-        id="dicomFiles"
-        name="dicomFiles"
-        webkitdirectory
-        directory
-        multiple
-        accept=".dcm"
-      />
-
-      <input type="submit" value="Enviar Orden" />
-    </form>
-  </section>
-
-  <section id="stlviewer">
-    <h2>Visor STL</h2>
-    <label for="stlFile">Carga un archivo STL para visualizar:</label>
-    <input
-      type="file"
-      id="stlFile"
-      accept=".stl"
-    />
-    <div id="viewer">
-      <div class="loading">Carga un archivo STL para ver el modelo aquí.</div>
-    </div>
-  </section>
-
-  <!-- Librerías necesarias -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/examples/js/loaders/STLLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-
-  <script>
-    // Variables globales para Three.js
-    let scene, camera, renderer, mesh, animationId;
-    const viewer = document.getElementById('viewer');
-    const loadingMessage = viewer.querySelector('.loading');
-
-    // Mostrar secciones
-    function mostrarSeccion(id) {
-      document.querySelectorAll('section').forEach((sec) => sec.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-      
-      // Si es la sección del visor, ajustar el tamaño del renderizador
-      if (id === 'stlviewer' && renderer) {
-        camera.aspect = viewer.clientWidth / viewer.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-      }
+  // Función mejorada para cargar STL
+  function cargarSTL(file) {
+    // Verificar que el archivo sea válido
+    if (!file || !file.name.endsWith('.stl')) {
+      loadingMessage.textContent = 'Archivo no válido. Debe ser un archivo .stl';
+      loadingMessage.style.display = 'block';
+      return;
     }
 
-    // Inicializar Three.js
-    function initThreeJS() {
-      // Limpiar escena anterior si existe
-      if (renderer) {
-        viewer.removeChild(renderer.domElement);
-        cancelAnimationFrame(animationId);
-      }
-      
-      // Crear escena
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xeeeeee);
-      
-      // Crear cámara
-      camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
-      camera.position.z = 5;
-      
-      // Crear renderizador
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-      viewer.insertBefore(renderer.domElement, loadingMessage);
-      
-      // Añadir luces
-      const ambientLight = new THREE.AmbientLight(0x404040, 2);
-      scene.add(ambientLight);
-      
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-      directionalLight.position.set(1, 1, 1).normalize();
-      scene.add(directionalLight);
-      
-      // Manejar redimensionamiento
-      window.addEventListener('resize', onWindowResize);
-    }
+    loadingMessage.textContent = "Cargando modelo...";
+    loadingMessage.style.display = 'block';
 
-    function onWindowResize() {
-      if (camera && renderer) {
-        camera.aspect = viewer.clientWidth / viewer.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-      }
-    }
-
-    // Función para cargar y mostrar STL
-    function cargarSTL(file) {
-      loadingMessage.textContent = "Cargando modelo...";
-      
-      const reader = new FileReader();
-      
-      reader.onload = function(e) {
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+      try {
         initThreeJS(); // Reiniciar la escena
         
         const loader = new THREE.STLLoader();
-        const geometry = loader.parse(e.target.result);
         
-        // Calcular centro y dimensiones
-        geometry.computeBoundingBox();
-        const bbox = geometry.boundingBox;
-        const center = new THREE.Vector3();
-        bbox.getCenter(center);
-        geometry.translate(-center.x, -center.y, -center.z);
-        
-        // Crear malla
-        const material = new THREE.MeshPhongMaterial({
-          color: 0x00aaff,
-          specular: 0x111111,
-          shininess: 50,
-          side: THREE.DoubleSide
-        });
-        
-        mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-        
-        // Ajustar cámara
-        const maxDim = Math.max(
-          bbox.max.x - bbox.min.x,
-          bbox.max.y - bbox.min.y,
-          bbox.max.z - bbox.min.z
+        // Usar callback para manejar errores
+        loader.load(
+          URL.createObjectURL(file), 
+          function(geometry) {
+            // Calcular centro y dimensiones
+            geometry.computeBoundingBox();
+            const bbox = geometry.boundingBox;
+            
+            // Verificar que la geometría es válida
+            if (!bbox || isNaN(bbox.min.x)) {
+              throw new Error('Geometría del modelo no válida');
+            }
+            
+            const center = new THREE.Vector3();
+            bbox.getCenter(center);
+            geometry.translate(-center.x, -center.y, -center.z);
+            
+            // Crear malla con material más visible
+            const material = new THREE.MeshPhongMaterial({
+              color: 0x00aaff,
+              specular: 0x111111,
+              shininess: 50,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.9
+            });
+            
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+            
+            // Ajustar cámara
+            const maxDim = Math.max(
+              bbox.max.x - bbox.min.x,
+              bbox.max.y - bbox.min.y,
+              bbox.max.z - bbox.min.z
+            );
+            camera.position.z = maxDim * 1.5;
+            
+            // Ocultar mensaje de carga
+            loadingMessage.style.display = 'none';
+            
+            // Animación
+            function animate() {
+              animationId = requestAnimationFrame(animate);
+              if (mesh) mesh.rotation.y += 0.01;
+              renderer.render(scene, camera);
+            }
+            animate();
+          },
+          undefined, // No usar progreso
+          function(error) {
+            console.error('Error al cargar STL:', error);
+            loadingMessage.textContent = 'Error al procesar el archivo STL';
+            loadingMessage.style.display = 'block';
+          }
         );
-        camera.position.z = maxDim * 1.5;
-        
-        // Ocultar mensaje de carga
-        loadingMessage.style.display = 'none';
-        
-        // Animación
-        function animate() {
-          animationId = requestAnimationFrame(animate);
-          if (mesh) mesh.rotation.y += 0.01;
-          renderer.render(scene, camera);
-        }
-        animate();
-      };
-      
-      reader.onerror = function(error) {
-        console.error('Error al leer el archivo:', error);
-        loadingMessage.textContent = 'Error al cargar el archivo STL.';
-      };
-      
-      reader.readAsArrayBuffer(file);
-    }
-
-    // Evento para visor STL
-    document.getElementById('stlFile').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        cargarSTL(file);
-      } else {
-        loadingMessage.textContent = 'Carga un archivo STL para ver el modelo aquí.';
+      } catch (error) {
+        console.error('Error en el procesamiento:', error);
+        loadingMessage.textContent = 'Error al mostrar el modelo';
         loadingMessage.style.display = 'block';
       }
-    });
-
-    // Configuración de EmailJS (opcional)
-    emailjs.init('TU_USER_ID_EMAILJS');
-
-    // Variables del formulario orden
-    const form = document.getElementById('ordenForm');
-    const dicomFilesInput = document.getElementById('dicomFiles');
-
-    // Envío del formulario con EmailJS
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-
-      const data = new FormData(form);
-
-      const dicomNames = dicomFilesInput.files.length > 0
-        ? Array.from(dicomFilesInput.files).map(f => f.name).join(', ')
-        : 'No se subieron archivos DICOM';
-
-      const templateParams = {
-        nombre: data.get('nombre'),
-        email: data.get('email'),
-        descripcion: data.get('descripcion'),
-        archivosDICOM: dicomNames
-      };
-
-      emailjs.send('TU_SERVICE_ID', 'TU_TEMPLATE_ID', templateParams)
-        .then(() => {
-          alert('¡Orden enviada correctamente!');
-          form.reset();
-        })
-        .catch((err) => {
-          alert('Error al enviar: ' + err);
-        });
-    });
+    };
     
-    // Inicializar Three.js al cargar la página
-    initThreeJS();
-  </script>
-</body>
-</html>
+    reader.onerror = function(error) {
+      console.error('Error de lectura:', error);
+      loadingMessage.textContent = 'Error al leer el archivo';
+      loadingMessage.style.display = 'block';
+    };
+    
+    reader.onabort = function() {
+      loadingMessage.textContent = 'Lectura del archivo cancelada';
+      loadingMessage.style.display = 'block';
+    };
+    
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Evento para visor STL mejorado
+  document.getElementById('stlFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Verificar tamaño del archivo (límite de 20MB)
+      if (file.size > 20 * 1024 * 1024) {
+        loadingMessage.textContent = 'Archivo demasiado grande (máx. 20MB)';
+        loadingMessage.style.display = 'block';
+        e.target.value = ''; // Limpiar selección
+        return;
+      }
+      
+      cargarSTL(file);
+    } else {
+      loadingMessage.textContent = 'Carga un archivo STL para ver el modelo aquí.';
+      loadingMessage.style.display = 'block';
+    }
+  });
+</script>

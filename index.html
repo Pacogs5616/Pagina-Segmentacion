@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visor 3D y Formulario de Orden</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background: #f0f0f0;
+    }
+    header {
+      background: #222;
+      color: white;
+      padding: 1em;
+      text-align: center;
+    }
+    nav {
+      background: #444;
+      display: flex;
+      justify-content: center;
+      gap: 1.5em;
+      padding: 1em 0;
+    }
+    nav button {
+      background: #666;
+      color: white;
+      border: none;
+      padding: 0.6em 1.2em;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+    nav button:hover {
+      background: #888;
+    }
+    section {
+      max-width: 900px;
+      margin: 2em auto;
+      background: white;
+      padding: 1.5em 2em;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: none;
+    }
+    section.active {
+      display: block;
+    }
+    form label {
+      display: block;
+      margin-top: 1em;
+      font-weight: bold;
+    }
+    form input[type="text"],
+    form input[type="email"],
+    form textarea {
+      width: 100%;
+      padding: 0.5em;
+      margin-top: 0.3em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    form input[type="file"] {
+      margin-top: 0.5em;
+    }
+    form input[type="submit"] {
+      margin-top: 1.5em;
+      background: #222;
+      color: white;
+      border: none;
+      padding: 0.7em 1.4em;
+      font-size: 1.1em;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    form input[type="submit"]:hover {
+      background: #444;
+    }
+    #viewer {
+      width: 100%;
+      height: 500px;
+      margin-top: 1em;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    #stlSelect {
+      margin-top: 1em;
+      font-size: 1em;
+      padding: 0.3em;
+      width: 100%;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Visor 3D y Formulario de Orden</h1>
+  </header>
+  <nav>
+    <button onclick="mostrarSeccion('inicio')">Inicio</button>
+    <button onclick="mostrarSeccion('orden')">Crear una Orden</button>
+  </nav>
+
+  <section id="inicio" class="active">
+    <h2>Bienvenido</h2>
+    <p>Haz clic en "Crear una Orden" para comenzar.</p>
+  </section>
+
+  <section id="orden">
+    <h2>Formulario de Orden</h2>
+    <form id="ordenForm">
+      <label for="nombre">Nombre:</label>
+      <input type="text" id="nombre" name="nombre" required />
+
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required />
+
+      <label for="descripcion">Descripción del proyecto:</label>
+      <textarea id="descripcion" name="descripcion" rows="4" required></textarea>
+
+      <label for="fileInput">Subir Carpeta de Archivos STL:</label>
+      <input
+        type="file"
+        id="fileInput"
+        name="files"
+        webkitdirectory
+        directory
+        multiple
+        required
+        accept=".stl"
+      />
+
+      <input type="submit" value="Enviar Orden" />
+    </form>
+
+    <h3>Visor STL</h3>
+    <select id="stlSelect"></select>
+    <div id="viewer"></div>
+  </section>
+
+  <!-- Librerías necesarias -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
+  <script>
+    // Mostrar secciones
+    function mostrarSeccion(id) {
+      document.querySelectorAll('section').forEach((sec) => sec.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // Inicializar EmailJS: cambia TU_USER_ID_EMAILJS por tu user ID real
+    emailjs.init('TU_USER_ID_EMAILJS');
+
+    const form = document.getElementById('ordenForm');
+    const fileInput = document.getElementById('fileInput');
+    const stlSelect = document.getElementById('stlSelect');
+    const viewer = document.getElementById('viewer');
+
+    let fileMap = {};
+
+    // Al cambiar archivos seleccionados
+    fileInput.addEventListener('change', () => {
+      fileMap = {};
+      stlSelect.innerHTML = '';
+      Array.from(fileInput.files).forEach((file) => {
+        if (file.name.toLowerCase().endsWith('.stl')) {
+          fileMap[file.name] = file;
+          const option = document.createElement('option');
+          option.value = file.name;
+          option.textContent = file.name;
+          stlSelect.appendChild(option);
+        }
+      });
+      if (stlSelect.options.length > 0) {
+        cargarSTL(fileMap[stlSelect.value]);
+      } else {
+        viewer.innerHTML = '';
+      }
+    });
+
+    stlSelect.addEventListener('change', () => {
+      const selectedFile = fileMap[stlSelect.value];
+      if (selectedFile) cargarSTL(selectedFile);
+    });
+
+    // Función para cargar y mostrar STL con Three.js
+    function cargarSTL(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        // Limpio renderer viejo si existe
+        if (viewer.renderer) {
+          viewer.renderer.dispose();
+          viewer.innerHTML = '';
+        }
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / 500, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(viewer.clientWidth, 500);
+        viewer.innerHTML = '';
+        viewer.appendChild(renderer.domElement);
+
+        viewer.renderer = renderer; // para limpieza después
+
+        const loader = new THREE.STLLoader();
+        const geometry = loader.parse(e.target.result);
+        const material = new THREE.MeshNormalMaterial();
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        // Luz
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(0, 0, 1).normalize();
+        scene.add(light);
+
+        camera.position.z = 100;
+
+        function animate() {
+          requestAnimationFrame(animate);
+          mesh.rotation.y += 0.01;
+          renderer.render(scene, camera);
+        }
+        animate();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Envío formulario con EmailJS
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const data = new FormData(form);
+
+      // Lista los nombres de archivos seleccionados
+      const archivos = Array.from(fileInput.files).map((f) => f.name).join(', ');
+
+      // Parámetros para plantilla de EmailJS
+      const templateParams = {
+        nombre: data.get('nombre'),
+        email: data.get('email'),
+        descripcion: data.get('descripcion'),
+        archivos: archivos,
+      };
+
+      emailjs
+        .send('TU_SERVICE_ID', 'TU_TEMPLATE_ID', templateParams)
+        .then(() => {
+          alert('¡Orden enviada correctamente!');
+          form.reset();
+          stlSelect.innerHTML = '';
+          viewer.innerHTML = '';
+        })
+        .catch((err) => {
+          alert('Error al enviar: ' + err);
+        });
+    });
+  </script>
+</body>
+</html>

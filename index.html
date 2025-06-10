@@ -98,11 +98,12 @@
   <nav>
     <button onclick="mostrarSeccion('inicio')">Inicio</button>
     <button onclick="mostrarSeccion('orden')">Crear una Orden</button>
+    <button onclick="mostrarSeccion('stlviewer')">Visor STL</button>
   </nav>
 
   <section id="inicio" class="active">
     <h2>Bienvenido</h2>
-    <p>Haz clic en "Crear una Orden" para comenzar.</p>
+    <p>Haz clic en "Crear una Orden" para comenzar o en "Visor STL" para ver modelos 3D.</p>
   </section>
 
   <section id="orden">
@@ -128,18 +129,26 @@
         accept=".dcm"
       />
 
-      <label for="stlFile">Sube un archivo STL para visualizar:</label>
+      <label for="stlFileOrden">Sube un archivo STL (no se visualiza aquí):</label>
       <input
         type="file"
-        id="stlFile"
-        name="stlFile"
+        id="stlFileOrden"
+        name="stlFileOrden"
         accept=".stl"
       />
 
       <input type="submit" value="Enviar Orden" />
     </form>
+  </section>
 
-    <h3>Visor STL</h3>
+  <section id="stlviewer">
+    <h2>Visor STL</h2>
+    <label for="stlFile">Carga un archivo STL para visualizar:</label>
+    <input
+      type="file"
+      id="stlFile"
+      accept=".stl"
+    />
     <div id="viewer">Carga un archivo STL para ver el modelo aquí.</div>
   </section>
 
@@ -156,53 +165,48 @@
 
     emailjs.init('TU_USER_ID_EMAILJS'); // Cambia aquí con tu user ID EmailJS
 
+    // Variables del formulario orden
     const form = document.getElementById('ordenForm');
     const dicomFilesInput = document.getElementById('dicomFiles');
+    const stlFileOrden = document.getElementById('stlFileOrden');
+
+    // Variables del visor STL (pestaña STL)
     const stlFileInput = document.getElementById('stlFile');
     const viewer = document.getElementById('viewer');
 
-    // Función para cargar y mostrar STL con Three.js (corregida)
+    // Función para cargar y mostrar STL con Three.js (igual que antes)
     function cargarSTL(file) {
       const reader = new FileReader();
       reader.onload = function (e) {
         viewer.innerHTML = '';
 
-        // Crear escena y cámara
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / 500, 0.1, 1000);
-
-        // Crear renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(viewer.clientWidth, 500);
         viewer.appendChild(renderer.domElement);
 
-        // Cargar STL
         const loader = new THREE.STLLoader();
         const geometry = loader.parse(e.target.result);
 
-        // Centrar geometría
         geometry.computeBoundingBox();
         const bbox = geometry.boundingBox;
         const centerX = (bbox.max.x + bbox.min.x) / 2;
         const centerY = (bbox.max.y + bbox.min.y) / 2;
         const centerZ = (bbox.max.z + bbox.min.z) / 2;
-
         geometry.translate(-centerX, -centerY, -centerZ);
 
-        // Crear mesh con material
         const material = new THREE.MeshNormalMaterial();
         const mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);
 
-        // Añadir luces
-        const ambientLight = new THREE.AmbientLight(0x404040, 2); // Luz ambiental suave
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
         scene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(0, 0, 1).normalize();
         scene.add(directionalLight);
 
-        // Ajustar cámara según tamaño del modelo
         const maxDim = Math.max(
           bbox.max.x - bbox.min.x,
           bbox.max.y - bbox.min.y,
@@ -211,7 +215,6 @@
         camera.position.set(0, 0, maxDim * 2);
         camera.lookAt(0, 0, 0);
 
-        // Animación para rotar el modelo
         function animate() {
           requestAnimationFrame(animate);
           mesh.rotation.y += 0.01;
@@ -222,7 +225,7 @@
       reader.readAsArrayBuffer(file);
     }
 
-    // Cuando cambie el archivo STL, cargar en el viewer
+    // Evento para visor STL en pestaña STL
     stlFileInput.addEventListener('change', () => {
       const file = stlFileInput.files[0];
       if (file) {
@@ -232,19 +235,18 @@
       }
     });
 
-    // Envío formulario con EmailJS
+    // Envío del formulario con EmailJS
     form.addEventListener('submit', (e) => {
       e.preventDefault();
 
       const data = new FormData(form);
 
-      // Archivos DICOM subidos (solo los nombres)
-      const dicomNames = dicomFilesInput.files.length > 0 ? Array.from(dicomFilesInput.files).map(f => f.name).join(', ') : 'No se subieron archivos DICOM';
+      const dicomNames = dicomFilesInput.files.length > 0
+        ? Array.from(dicomFilesInput.files).map(f => f.name).join(', ')
+        : 'No se subieron archivos DICOM';
 
-      // Archivo STL subido (nombre)
-      const stlName = stlFileInput.files[0]?.name || 'No se subió STL';
+      const stlName = stlFileOrden.files[0]?.name || 'No se subió STL';
 
-      // Parámetros para plantilla EmailJS
       const templateParams = {
         nombre: data.get('nombre') || 'No proporcionado',
         email: data.get('email') || 'No proporcionado',
@@ -257,7 +259,6 @@
         .then(() => {
           alert('¡Orden enviada correctamente!');
           form.reset();
-          viewer.innerHTML = 'Carga un archivo STL para ver el modelo aquí.';
         })
         .catch((err) => {
           alert('Error al enviar: ' + err);

@@ -1,122 +1,339 @@
-<script>
-  // Variables globales para Three.js
-  let scene, camera, renderer, mesh, animationId;
-  const viewer = document.getElementById('viewer');
-  const loadingMessage = viewer.querySelector('.loading');
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visor STL Funcional</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; 
+      padding: 0;
+      background: #f0f0f0;
+    }
+    header {
+      background: #222;
+      color: white;
+      padding: 1em;
+      text-align: center;
+    }
+    nav {
+      background: #444;
+      display: flex;
+      justify-content: center;
+      gap: 1.5em;
+      padding: 1em 0;
+    }
+    nav button {
+      background: #666;
+      color: white;
+      border: none;
+      padding: 0.6em 1.2em;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+    nav button:hover {
+      background: #888;
+    }
+    section {
+      max-width: 900px;
+      margin: 2em auto;
+      background: white;
+      padding: 1.5em 2em;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: none;
+    }
+    section.active {
+      display: block;
+    }
+    #viewer-container {
+      width: 100%;
+      height: 500px;
+      margin-top: 1em;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #eee;
+      position: relative;
+      overflow: hidden;
+    }
+    #viewer {
+      width: 100%;
+      height: 100%;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2em;
+      color: #333;
+      background: rgba(255,255,255,0.8);
+      padding: 10px 20px;
+      border-radius: 5px;
+    }
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    .controls button {
+      padding: 5px 10px;
+      background: #444;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Visor STL Funcional</h1>
+  </header>
+  <nav>
+    <button onclick="mostrarSeccion('inicio')">Inicio</button>
+    <button onclick="mostrarSeccion('stlviewer')">Visor STL</button>
+  </nav>
 
-  // Función mejorada para cargar STL
-  function cargarSTL(file) {
-    // Verificar que el archivo sea válido
-    if (!file || !file.name.endsWith('.stl')) {
-      loadingMessage.textContent = 'Archivo no válido. Debe ser un archivo .stl';
-      loadingMessage.style.display = 'block';
-      return;
+  <section id="inicio" class="active">
+    <h2>Bienvenido al Visor STL</h2>
+    <p>Selecciona "Visor STL" para cargar y visualizar tus modelos 3D en formato STL.</p>
+  </section>
+
+  <section id="stlviewer">
+    <h2>Visor de Modelos STL</h2>
+    <label for="stlFile">Selecciona un archivo STL:</label>
+    <input type="file" id="stlFile" accept=".stl" />
+    
+    <div id="viewer-container">
+      <div id="viewer"></div>
+      <div class="loading">Esperando archivo STL...</div>
+    </div>
+    
+    <div class="controls">
+      <button onclick="rotarModelo('x')">Rotar X</button>
+      <button onclick="rotarModelo('y')">Rotar Y</button>
+      <button onclick="rotarModelo('z')">Rotar Z</button>
+      <button onclick="resetCamera()">Reiniciar Vista</button>
+    </div>
+  </section>
+
+  <!-- Librerías Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/STLLoader.js"></script>
+
+  <script>
+    // Variables globales
+    let scene, camera, renderer, controls, mesh;
+    let animationId = null;
+    const viewer = document.getElementById('viewer');
+    const viewerContainer = document.getElementById('viewer-container');
+    const loadingMessage = document.querySelector('.loading');
+
+    // Mostrar sección
+    function mostrarSeccion(id) {
+      document.querySelectorAll('section').forEach(sec => {
+        sec.classList.remove('active');
+      });
+      document.getElementById(id).classList.add('active');
+      
+      if (id === 'stlviewer') {
+        ajustarTamañoVisor();
+      }
     }
 
-    loadingMessage.textContent = "Cargando modelo...";
-    loadingMessage.style.display = 'block';
-
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-      try {
-        initThreeJS(); // Reiniciar la escena
-        
-        const loader = new THREE.STLLoader();
-        
-        // Usar callback para manejar errores
-        loader.load(
-          URL.createObjectURL(file), 
-          function(geometry) {
-            // Calcular centro y dimensiones
-            geometry.computeBoundingBox();
-            const bbox = geometry.boundingBox;
-            
-            // Verificar que la geometría es válida
-            if (!bbox || isNaN(bbox.min.x)) {
-              throw new Error('Geometría del modelo no válida');
-            }
-            
-            const center = new THREE.Vector3();
-            bbox.getCenter(center);
-            geometry.translate(-center.x, -center.y, -center.z);
-            
-            // Crear malla con material más visible
-            const material = new THREE.MeshPhongMaterial({
-              color: 0x00aaff,
-              specular: 0x111111,
-              shininess: 50,
-              side: THREE.DoubleSide,
-              transparent: true,
-              opacity: 0.9
-            });
-            
-            mesh = new THREE.Mesh(geometry, material);
-            scene.add(mesh);
-            
-            // Ajustar cámara
-            const maxDim = Math.max(
-              bbox.max.x - bbox.min.x,
-              bbox.max.y - bbox.min.y,
-              bbox.max.z - bbox.min.z
-            );
-            camera.position.z = maxDim * 1.5;
-            
-            // Ocultar mensaje de carga
-            loadingMessage.style.display = 'none';
-            
-            // Animación
-            function animate() {
-              animationId = requestAnimationFrame(animate);
-              if (mesh) mesh.rotation.y += 0.01;
-              renderer.render(scene, camera);
-            }
-            animate();
-          },
-          undefined, // No usar progreso
-          function(error) {
-            console.error('Error al cargar STL:', error);
-            loadingMessage.textContent = 'Error al procesar el archivo STL';
-            loadingMessage.style.display = 'block';
-          }
-        );
-      } catch (error) {
-        console.error('Error en el procesamiento:', error);
-        loadingMessage.textContent = 'Error al mostrar el modelo';
-        loadingMessage.style.display = 'block';
+    // Inicializar Three.js
+    function initThreeJS() {
+      // Limpiar escena anterior si existe
+      if (renderer) {
+        viewer.removeChild(renderer.domElement);
+        cancelAnimationFrame(animationId);
       }
-    };
-    
-    reader.onerror = function(error) {
-      console.error('Error de lectura:', error);
-      loadingMessage.textContent = 'Error al leer el archivo';
-      loadingMessage.style.display = 'block';
-    };
-    
-    reader.onabort = function() {
-      loadingMessage.textContent = 'Lectura del archivo cancelada';
-      loadingMessage.style.display = 'block';
-    };
-    
-    reader.readAsArrayBuffer(file);
-  }
+      
+      // Crear escena
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xeeeeee);
+      
+      // Crear cámara
+      camera = new THREE.PerspectiveCamera(
+        75, 
+        viewerContainer.clientWidth / viewerContainer.clientHeight, 
+        0.1, 
+        1000
+      );
+      camera.position.z = 5;
+      
+      // Crear renderizador
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(viewerContainer.clientWidth, viewerContainer.clientHeight);
+      viewer.appendChild(renderer.domElement);
+      
+      // Añadir controles de órbita
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.25;
+      
+      // Añadir luces
+      const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(1, 1, 1).normalize();
+      scene.add(directionalLight);
+      
+      // Ejes de referencia (opcional)
+      const axesHelper = new THREE.AxesHelper(5);
+      scene.add(axesHelper);
+      
+      // Animación
+      function animate() {
+        animationId = requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+      
+      // Manejar redimensionamiento
+      window.addEventListener('resize', ajustarTamañoVisor);
+    }
 
-  // Evento para visor STL mejorado
-  document.getElementById('stlFile').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Verificar tamaño del archivo (límite de 20MB)
-      if (file.size > 20 * 1024 * 1024) {
-        loadingMessage.textContent = 'Archivo demasiado grande (máx. 20MB)';
-        loadingMessage.style.display = 'block';
-        e.target.value = ''; // Limpiar selección
+    function ajustarTamañoVisor() {
+      if (!camera || !renderer) return;
+      
+      camera.aspect = viewerContainer.clientWidth / viewerContainer.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(viewerContainer.clientWidth, viewerContainer.clientHeight);
+    }
+
+    // Cargar archivo STL
+    function cargarSTL(file) {
+      // Validar archivo
+      if (!file || !file.name.toLowerCase().endsWith('.stl')) {
+        mostrarError('El archivo debe tener extensión .stl');
         return;
       }
       
-      cargarSTL(file);
-    } else {
-      loadingMessage.textContent = 'Carga un archivo STL para ver el modelo aquí.';
+      if (file.size > 50 * 1024 * 1024) { // 50MB máximo
+        mostrarError('El archivo es demasiado grande (máx. 50MB)');
+        return;
+      }
+      
+      loadingMessage.textContent = "Cargando modelo...";
+      loadingMessage.style.display = 'block';
+      
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        try {
+          const loader = new THREE.STLLoader();
+          const geometry = loader.parse(e.target.result);
+          
+          // Verificar geometría
+          if (!geometry || !geometry.attributes || !geometry.attributes.position) {
+            throw new Error('Geometría del modelo no válida');
+          }
+          
+          // Calcular centro y dimensiones
+          geometry.computeBoundingBox();
+          const bbox = geometry.boundingBox;
+          
+          const center = new THREE.Vector3();
+          bbox.getCenter(center);
+          geometry.translate(-center.x, -center.y, -center.z);
+          
+          // Crear malla
+          const material = new THREE.MeshPhongMaterial({
+            color: 0x00aaff,
+            specular: 0x111111,
+            shininess: 50,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+          });
+          
+          // Eliminar modelo anterior si existe
+          if (mesh) {
+            scene.remove(mesh);
+          }
+          
+          mesh = new THREE.Mesh(geometry, material);
+          scene.add(mesh);
+          
+          // Ajustar cámara al modelo
+          const maxDim = Math.max(
+            bbox.max.x - bbox.min.x,
+            bbox.max.y - bbox.min.y,
+            bbox.max.z - bbox.min.z
+          );
+          camera.position.z = maxDim * 1.5;
+          controls.target.copy(center);
+          controls.update();
+          
+          // Ocultar mensaje de carga
+          loadingMessage.style.display = 'none';
+          
+        } catch (error) {
+          console.error('Error al procesar STL:', error);
+          mostrarError('Error al procesar el archivo STL');
+        }
+      };
+      
+      reader.onerror = function(error) {
+        console.error('Error de lectura:', error);
+        mostrarError('Error al leer el archivo');
+      };
+      
+      reader.readAsArrayBuffer(file);
+    }
+
+    function mostrarError(mensaje) {
+      loadingMessage.textContent = mensaje;
       loadingMessage.style.display = 'block';
     }
-  });
-</script>
+
+    // Controles de rotación
+    function rotarModelo(eje) {
+      if (!mesh) return;
+      
+      switch(eje) {
+        case 'x':
+          mesh.rotation.x += Math.PI / 8;
+          break;
+        case 'y':
+          mesh.rotation.y += Math.PI / 8;
+          break;
+        case 'z':
+          mesh.rotation.z += Math.PI / 8;
+          break;
+      }
+    }
+
+    function resetCamera() {
+      if (!mesh || !controls) return;
+      
+      mesh.rotation.set(0, 0, 0);
+      controls.reset();
+    }
+
+    // Evento para cargar archivo STL
+    document.getElementById('stlFile').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        cargarSTL(file);
+      } else {
+        loadingMessage.textContent = 'Esperando archivo STL...';
+        loadingMessage.style.display = 'block';
+      }
+    });
+
+    // Inicializar al cargar la página
+    window.addEventListener('load', () => {
+      initThreeJS();
+    });
+  </script>
+</body>
+</html>

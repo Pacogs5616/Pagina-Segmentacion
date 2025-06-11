@@ -529,4 +529,14 @@
     });
   </script>
 </body>
+  <!-- Formulario flotante -->
+<div id="formularioContainer" style="position:fixed; bottom:20px; right:20px; background:#fff; padding:20px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.2); z-index:1000;">
+  <form id="emailForm">
+    <input type="text" name="name" placeholder="Tu nombre" required><br><br>
+    <input type="email" name="email" placeholder="Tu correo" required><br><br>
+    <textarea name="message" placeholder="Detalles de la segmentación..." required></textarea><br><br>
+    <button type="submit">Enviar</button>
+  </form>
+</div>
+
 </html>

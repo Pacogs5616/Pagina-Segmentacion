@@ -138,27 +138,6 @@
       color: #666;
     }
   </style>
-  <meta charset="UTF-8">
-  <title>Tu Página</title>
-  <style>
-    .video-container {
-      position: relative;
-      padding-bottom: 56.25%;
-      height: 0;
-      overflow: hidden;
-      margin-top: 1em;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
-    }
-
-    .video-container iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-  </style>
 </head>
 <body>
   <header>
@@ -168,7 +147,6 @@
     <button onclick="mostrarSeccion('inicio')">Inicio</button>
     <button onclick="mostrarSeccion('orden')">Crear Orden</button>
     <button onclick="mostrarSeccion('stlviewer')">Visor STL</button>
-    <button onclick="mostrarSeccion('tutorial')">Tutorial</button>
   </nav>
 
   <section id="inicio" class="active">
@@ -178,15 +156,7 @@
 
   <section id="orden">
     <h2>Formulario de Orden</h2>
-    <form 
-      id="ordenForm"
-      action="https://formspree.io/f/xnnvdpkd" 
-      method="POST"
-      enctype="multipart/form-data"
-    >
-      <input type="hidden" name="_subject" value="Nueva Orden de Impresión 3D">
-      <input type="hidden" name="_next" value="https://tusitio.github.io/gracias.html">
-      
+    <form id="ordenForm">
       <label for="nombre">Nombre completo:</label>
       <input type="text" id="nombre" name="nombre" required />
 
@@ -260,24 +230,11 @@
     </div>
   </section>
 
-  <section id="tutorial">
-  <h2>Tutorial</h2>
-  <p>A continuación puedes ver el tutorial sobre cómo utilizar esta plataforma:</p>
-  <div class="video-container">
-    <iframe 
-      src="https://www.youtube.com/embed/SrA0Tq0EDf4" 
-      title="Tutorial" 
-      frameborder="0" 
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-      allowfullscreen>
-    </iframe>
-  </div>
-</section>
-  
   <!-- Librerías Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
   <script>
     // Variables globales
@@ -364,18 +321,21 @@
       renderer.setSize(viewerContainer.clientWidth, viewerContainer.clientHeight);
     }
 
-    // Cargar archivo STL
+    // Cargar archivo STL (versión con límite de 500MB)
     function cargarSTL(file) {
+      // Validar archivo
       if (!file || !file.name.toLowerCase().endsWith('.stl')) {
         mostrarError('El archivo debe tener extensión .stl');
         return;
       }
       
+      // Límite aumentado a 500MB (500 * 1024 * 1024 bytes)
       if (file.size > 500 * 1024 * 1024) {
         mostrarError('El archivo es demasiado grande (máx. 500MB)');
         return;
       }
       
+      // Mostrar información del archivo
       document.getElementById('stlViewerInfo').textContent = 
         Archivo: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB);
       
@@ -401,10 +361,12 @@
           const loader = new THREE.STLLoader();
           const geometry = loader.parse(e.target.result);
           
+          // Verificar geometría
           if (!geometry || !geometry.attributes || !geometry.attributes.position) {
             throw new Error('Geometría del modelo no válida');
           }
           
+          // Calcular centro y dimensiones
           geometry.computeBoundingBox();
           const bbox = geometry.boundingBox;
           
@@ -412,6 +374,7 @@
           bbox.getCenter(center);
           geometry.translate(-center.x, -center.y, -center.z);
           
+          // Crear malla
           const material = new THREE.MeshPhongMaterial({
             color: 0x00aaff,
             specular: 0x111111,
@@ -422,6 +385,7 @@
             wireframe: wireframeEnabled
           });
           
+          // Eliminar modelo anterior si existe
           if (mesh) {
             scene.remove(mesh);
           }
@@ -429,6 +393,7 @@
           mesh = new THREE.Mesh(geometry, material);
           scene.add(mesh);
           
+          // Ajustar cámara al modelo
           const maxDim = Math.max(
             bbox.max.x - bbox.min.x,
             bbox.max.y - bbox.min.y,
@@ -438,6 +403,7 @@
           controls.target.copy(center);
           controls.update();
           
+          // Ocultar mensaje de carga
           loadingMessage.style.display = 'none';
           progressContainer.style.display = 'none';
           
@@ -533,11 +499,18 @@
       }
     });
 
-    // Configuración del envío del formulario con Formspree
+    // Configuración de EmailJS
+    emailjs.init('TU_USER_ID_EMAILJS');
+
+    // Envío del formulario
     document.getElementById('ordenForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
       const progressBar = document.querySelector('#uploadProgress .progress-bar');
       const progressContainer = document.getElementById('uploadProgress');
       
+      // Simular progreso de carga (en una implementación real usarías XMLHttpRequest con eventos de progreso)
       progressContainer.style.display = 'block';
       let progress = 0;
       const interval = setInterval(() => {
@@ -545,18 +518,16 @@
         progressBar.style.width = progress + '%';
         if (progress >= 100) {
           clearInterval(interval);
+          progressContainer.style.display = 'none';
+          alert('Orden enviada correctamente (simulación)');
+          this.reset();
+          document.getElementById('dicomInfo').textContent = '';
+          document.getElementById('stlInfo').textContent = '';
         }
       }, 100);
       
-      // Validación adicional opcional
-      const dicomFiles = document.getElementById('dicomFiles').files;
-      if (dicomFiles.length === 0) {
-        e.preventDefault();
-        alert('Por favor, selecciona al menos un archivo DICOM');
-        progressContainer.style.display = 'none';
-        progressBar.style.width = '0%';
-        return;
-      }
+      // En una implementación real, aquí enviarías el formulario a tu backend
+      // o usarías EmailJS para enviar los datos por correo
     });
 
     // Inicializar al cargar la página
@@ -565,5 +536,4 @@
     });
   </script>
 </body>
-</div>
 </html>

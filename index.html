@@ -178,154 +178,100 @@
 
   <section id="orden">
     <h2>Formulario de Orden</h2>
-<form id="ordenForm" enctype="multipart/form-data">
-  <input type="hidden" name="_subject" value="Nueva Orden de Impresión 3D" />
-  <input type="hidden" name="_next" value="https://tusitio.github.io/gracias.html" />
+    <form 
+      id="ordenForm"
+      action="https://formspree.io/f/xnnvdpkd" 
+      method="POST"
+      enctype="multipart/form-data"
+    >
+      <input type="hidden" name="_subject" value="Nueva Orden de Impresión 3D">
+      <input type="hidden" name="_next" value="https://tusitio.github.io/gracias.html">
+      
+      <label for="nombre">Nombre completo:</label>
+      <input type="text" id="nombre" name="nombre" required />
 
-  <label for="nombre">Nombre completo:</label>
-  <input type="text" id="nombre" name="nombre" required />
+      <label for="email">Correo electrónico:</label>
+      <input type="email" id="email" name="email" required />
 
-  <label for="email">Correo electrónico:</label>
-  <input type="email" id="email" name="email" required />
+      <label for="telefono">Teléfono de contacto:</label>
+      <input type="text" id="telefono" name="telefono" />
 
-  <label for="telefono">Teléfono de contacto:</label>
-  <input type="text" id="telefono" name="telefono" />
+      <label for="descripcion">Descripción del proyecto:</label>
+      <textarea id="descripcion" name="descripcion" rows="4" required></textarea>
 
-  <label for="descripcion">Descripción del proyecto:</label>
-  <textarea id="descripcion" name="descripcion" rows="4" required></textarea>
+      <label for="prioridad">Prioridad:</label>
+      <select id="prioridad" name="prioridad">
+        <option value="normal">Normal (5-7 días)</option>
+        <option value="urgente">Urgente (2-3 días)</option>
+        <option value="express">Express (24 horas)</option>
+      </select>
 
-  <label for="prioridad">Prioridad:</label>
-  <select id="prioridad" name="prioridad">
-    <option value="normal">Normal (5-7 días)</option>
-    <option value="urgente">Urgente (2-3 días)</option>
-    <option value="express">Express (24 horas)</option>
-  </select>
+      <label for="dicomFiles">Archivos DICOM (carpeta o múltiples archivos):</label>
+      <input
+        type="file"
+        id="dicomFiles"
+        name="dicomFiles"
+        webkitdirectory
+        directory
+        multiple
+        accept=".dcm"
+      />
+      <div class="file-info" id="dicomInfo"></div>
 
-  <label for="dicomFiles">Archivos DICOM (carpeta o múltiples archivos):</label>
-  <input
-    type="file"
-    id="dicomFiles"
-    name="dicomFiles"
-    webkitdirectory
-    directory
-    multiple
-    accept=".dcm"
-  />
-  <div class="file-info" id="dicomInfo"></div>
+      <label for="stlFileOrden">Archivo STL (opcional):</label>
+      <input
+        type="file"
+        id="stlFileOrden"
+        name="stlFileOrden"
+        accept=".stl"
+      />
+      <div class="file-info" id="stlInfo"></div>
 
-  <label for="stlFileOrden">Archivo STL (opcional):</label>
-  <input type="file" id="stlFileOrden" name="stlFileOrden" accept=".stl" />
-  <div class="file-info" id="stlInfo"></div>
+      <div class="progress-container" id="uploadProgress">
+        <div class="progress-bar"></div>
+      </div>
 
-  <div class="progress-container" id="uploadProgress" style="width: 100%; background: #eee; height: 20px; margin: 10px 0;">
-    <div class="progress-bar" style="width: 0%; height: 100%; background: #4caf50;"></div>
+      <input type="submit" value="Enviar Orden" />
+    </form>
+  </section>
+
+  <section id="stlviewer">
+    <h2>Visor de Modelos STL</h2>
+    <label for="stlFile">Seleccione un archivo STL (hasta 500MB):</label>
+    <input type="file" id="stlFile" accept=".stl" />
+    <div class="file-info" id="stlViewerInfo"></div>
+
+    <div class="progress-container" id="viewerProgress">
+      <div class="progress-bar"></div>
+    </div>
+
+    <div id="viewer-container">
+      <div id="viewer"></div>
+      <div class="loading">Esperando archivo STL...</div>
+    </div>
+    
+    <div class="controls">
+      <button onclick="rotarModelo('x')">Rotar X</button>
+      <button onclick="rotarModelo('y')">Rotar Y</button>
+      <button onclick="rotarModelo('z')">Rotar Z</button>
+      <button onclick="resetCamera()">Reiniciar Vista</button>
+      <button onclick="toggleWireframe()">Mostrar Malla</button>
+      <button onclick="toggleAxes()">Mostrar Ejes</button>
+    </div>
+  </section>
+
+  <section id="tutorial">
+  <h2>Tutorial</h2>
+  <p>A continuación puedes ver el tutorial sobre cómo utilizar esta plataforma:</p>
+  <div class="video-container">
+    <iframe 
+      src="https://www.youtube.com/embed/SrA0Tq0EDf4" 
+      title="Tutorial" 
+      frameborder="0" 
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+      allowfullscreen>
+    </iframe>
   </div>
-
-  <input type="submit" value="Enviar Orden" />
-</form>
-
-<div id="response"></div>
-
-<script>
-  const form = document.getElementById('ordenForm');
-  const responseDiv = document.getElementById('response');
-  const progressBar = document.querySelector('.progress-bar');
-
-  // URL de tu Google Apps Script web app
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyvSSqXFnOzg48vSASNK7hwRJ4EnTCG0wawJ9_3uwvHLCpJw8uexo52K8Bj6GTc_gxFAg/exec';
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    responseDiv.textContent = '';
-    progressBar.style.width = '0%';
-
-    // Recoger datos de texto
-    const formData = {
-      nombre: form.nombre.value,
-      email: form.email.value,
-      telefono: form.telefono.value,
-      descripcion: form.descripcion.value,
-      prioridad: form.prioridad.value,
-      _subject: form._subject.value,
-      _next: form._next.value
-    };
-
-    // Función para leer un archivo y devolver base64
-    const fileToBase64 = (file) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    // Procesar archivos DICOM (pueden ser varios)
-    const dicomFiles = form.dicomFiles.files;
-    let dicomBase64Files = [];
-    for (let i = 0; i < dicomFiles.length; i++) {
-      const base64 = await fileToBase64(dicomFiles[i]);
-      dicomBase64Files.push({
-        name: dicomFiles[i].name,
-        content: base64
-      });
-      // Actualizar progreso aproximado
-      progressBar.style.width = `${Math.round(((i + 1) / (dicomFiles.length + 1)) * 50)}%`;
-    }
-
-    // Procesar archivo STL (opcional)
-    let stlBase64 = null;
-    let stlName = '';
-    if (form.stlFileOrden.files.length > 0) {
-      stlName = form.stlFileOrden.files[0].name;
-      stlBase64 = await fileToBase64(form.stlFileOrden.files[0]);
-      progressBar.style.width = '75%';
-    }
-
-    // Construir payload para enviar
-    // Como tu script solo maneja un archivo base64, para múltiples archivos tendrías que modificar el script.
-    // Aquí te envío solo el STL si existe, o el primer DICOM, para que funcione con tu script actual.
-    // Para múltiples archivos, el script debe adaptarse para recibir y guardar varios archivos.
-
-    let fileToSendBase64 = null;
-    let filenameToSend = '';
-
-    if (stlBase64) {
-      fileToSendBase64 = stlBase64;
-      filenameToSend = stlName;
-    } else if (dicomBase64Files.length > 0) {
-      fileToSendBase64 = dicomBase64Files[0].content;
-      filenameToSend = dicomBase64Files[0].name;
-    } else {
-      responseDiv.textContent = 'Por favor, selecciona al menos un archivo DICOM o STL.';
-      return;
-    }
-
-    // Enviar datos al Google Apps Script
-    // Solo enviamos archivo y nombre, para guardar en Drive.
-    // Si quieres guardar también los campos de texto, debes modificar el script para recibirlos.
-
-    const url = new URL(SCRIPT_URL);
-    url.searchParams.append('file', fileToSendBase64);
-    url.searchParams.append('filename', filenameToSend);
-
-    try {
-      const res = await fetch(url.toString(), { method: 'POST' });
-      const text = await res.text();
-      progressBar.style.width = '100%';
-      responseDiv.textContent = text;
-
-      // Redirigir si está definido _next
-      if (form._next.value) {
-        setTimeout(() => {
-          window.location.href = form._next.value;
-        }, 2000);
-      }
-    } catch (error) {
-      responseDiv.textContent = 'Error al subir el archivo: ' + error.message;
-      progressBar.style.width = '0%';
-    }
-  });
-</script>
-
 </section>
   
   <!-- Librerías Three.js -->
@@ -621,7 +567,3 @@
 </body>
 </div>
 </html>
-
-este es mi codigo, pudieras cambiar lo de formspree por esto nuevo de drive. Este es mi URL 
-
-https://script.google.com/macros/s/AKfycbyvSSqXFnOzg48vSASNK7hwRJ4EnTCG0wawJ9_3uwvHLCpJw8uexo52K8Bj6GTc_gxFAg/exec

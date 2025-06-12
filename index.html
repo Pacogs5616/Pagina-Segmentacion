@@ -227,11 +227,10 @@
     </div>
   </section>
   
-  <!-- Librerías Three.js -->
+ <!-- Librerías Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/STLLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
   <script>
     // Variables globales
@@ -243,7 +242,7 @@
     const viewerContainer = document.getElementById('viewer-container');
     const loadingMessage = document.querySelector('.loading');
 
-    // Función para mostrar secciones
+    // Mostrar sección
     function mostrarSeccion(id) {
       document.querySelectorAll('section').forEach(sec => {
         sec.classList.remove('active');
@@ -318,23 +317,20 @@
       renderer.setSize(viewerContainer.clientWidth, viewerContainer.clientHeight);
     }
 
-    // Cargar archivo STL (versión con límite de 500MB)
+    // Cargar archivo STL
     function cargarSTL(file) {
-      // Validar archivo
       if (!file || !file.name.toLowerCase().endsWith('.stl')) {
         mostrarError('El archivo debe tener extensión .stl');
         return;
       }
       
-      // Límite aumentado a 500MB (500 * 1024 * 1024 bytes)
       if (file.size > 500 * 1024 * 1024) {
         mostrarError('El archivo es demasiado grande (máx. 500MB)');
         return;
       }
       
-      // Mostrar información del archivo
       document.getElementById('stlViewerInfo').textContent = 
-        `Archivo: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
+        Archivo: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB);
       
       loadingMessage.textContent = "Cargando modelo...";
       loadingMessage.style.display = 'block';
@@ -358,12 +354,10 @@
           const loader = new THREE.STLLoader();
           const geometry = loader.parse(e.target.result);
           
-          // Verificar geometría
           if (!geometry || !geometry.attributes || !geometry.attributes.position) {
             throw new Error('Geometría del modelo no válida');
           }
           
-          // Calcular centro y dimensiones
           geometry.computeBoundingBox();
           const bbox = geometry.boundingBox;
           
@@ -371,7 +365,6 @@
           bbox.getCenter(center);
           geometry.translate(-center.x, -center.y, -center.z);
           
-          // Crear malla
           const material = new THREE.MeshPhongMaterial({
             color: 0x00aaff,
             specular: 0x111111,
@@ -382,7 +375,6 @@
             wireframe: wireframeEnabled
           });
           
-          // Eliminar modelo anterior si existe
           if (mesh) {
             scene.remove(mesh);
           }
@@ -390,7 +382,6 @@
           mesh = new THREE.Mesh(geometry, material);
           scene.add(mesh);
           
-          // Ajustar cámara al modelo
           const maxDim = Math.max(
             bbox.max.x - bbox.min.x,
             bbox.max.y - bbox.min.y,
@@ -400,7 +391,6 @@
           controls.target.copy(center);
           controls.update();
           
-          // Ocultar mensaje de carga
           loadingMessage.style.display = 'none';
           progressContainer.style.display = 'none';
           
@@ -480,7 +470,7 @@
       if (files && files.length > 0) {
         const totalSize = Array.from(files).reduce((sum, file) => sum + file.size, 0);
         document.getElementById('dicomInfo').textContent = 
-          `${files.length} archivos DICOM seleccionados (${(totalSize / (1024 * 1024)).toFixed(2)} MB)`;
+          ${files.length} archivos DICOM seleccionados (${(totalSize / (1024 * 1024)).toFixed(2)} MB);
       } else {
         document.getElementById('dicomInfo').textContent = '';
       }
@@ -490,24 +480,17 @@
       const file = e.target.files[0];
       if (file) {
         document.getElementById('stlInfo').textContent = 
-          `Archivo STL: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
+          Archivo STL: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB);
       } else {
         document.getElementById('stlInfo').textContent = '';
       }
     });
 
-    // Configuración de EmailJS
-    emailjs.init('TU_USER_ID_EMAILJS');
-
-    // Envío del formulario
+    // Configuración del envío del formulario con Formspree
     document.getElementById('ordenForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      const formData = new FormData(this);
       const progressBar = document.querySelector('#uploadProgress .progress-bar');
       const progressContainer = document.getElementById('uploadProgress');
       
-      // Simular progreso de carga (en una implementación real usarías XMLHttpRequest con eventos de progreso)
       progressContainer.style.display = 'block';
       let progress = 0;
       const interval = setInterval(() => {
@@ -515,24 +498,25 @@
         progressBar.style.width = progress + '%';
         if (progress >= 100) {
           clearInterval(interval);
-          progressContainer.style.display = 'none';
-          alert('Orden enviada correctamente (simulación)');
-          this.reset();
-          document.getElementById('dicomInfo').textContent = '';
-          document.getElementById('stlInfo').textContent = '';
         }
       }, 100);
+      
+      // Validación adicional opcional
+      const dicomFiles = document.getElementById('dicomFiles').files;
+      if (dicomFiles.length === 0) {
+        e.preventDefault();
+        alert('Por favor, selecciona al menos un archivo DICOM');
+        progressContainer.style.display = 'none';
+        progressBar.style.width = '0%';
+        return;
+      }
     });
 
     // Inicializar al cargar la página
     window.addEventListener('load', () => {
       initThreeJS();
-      // Asegurarse de que la sección de inicio esté activa al principio
-      mostrarSeccion('inicio');
     });
-
-    // Hacer la función mostrarSeccion accesible globalmente
-    window.mostrarSeccion = mostrarSeccion;
   </script>
 </body>
+</div>
 </html>

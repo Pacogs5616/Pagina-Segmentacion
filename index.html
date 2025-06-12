@@ -534,19 +534,39 @@
     });
 
     // Configuración del envío del formulario con Formspree
-    document.getElementById('ordenForm').addEventListener('submit', function(e) {
-      const progressBar = document.querySelector('#uploadProgress .progress-bar');
-      const progressContainer = document.getElementById('uploadProgress');
-      
-      progressContainer.style.display = 'block';
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 5;
-        progressBar.style.width = progress + '%';
-        if (progress >= 100) {
-          clearInterval(interval);
-        }
-      }, 100);
+    <form id="uploadForm">
+  <input type="file" id="fileInput" required />
+  <button type="submit">Upload to Drive</button>
+</form>
+
+<script>
+  const form = document.getElementById("uploadForm");
+  const fileInput = document.getElementById("fileInput");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async function () {
+      const base64 = reader.result.split(',')[1]; // Remove data prefix
+      const response = await fetch("YOUR_WEB_APP_URL", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          file: base64,
+          filename: file.name
+        })
+      });
+
+      const result = await response.text();
+      alert(result);
+    };
+
+    reader.readAsDataURL(file);
+  });
+</script>
+
       
       // Validación adicional opcional
       const dicomFiles = document.getElementById('dicomFiles').files;

@@ -158,10 +158,10 @@
     <h1>Visor 3D y Formulario de Orden</h1>
   </header>
   <nav>
-    <button onclick="mostrarSeccion('inicio')">Inicio</button>
-    <button onclick="mostrarSeccion('orden')">Crear Orden</button>
-    <button onclick="mostrarSeccion('stlviewer')">Visor STL</button>
-    <button onclick="mostrarSeccion('tutorial')">Tutorial</button>
+    <button data-section="inicio">Inicio</button>
+    <button data-section="orden">Crear Orden</button>
+    <button data-section="stlviewer">Visor STL</button>
+    <button data-section="tutorial">Tutorial</button>
   </nav>
 
   <section id="inicio" class="active">
@@ -170,23 +170,15 @@
   </section>
 
   <section id="orden">
-  <h2>Formulario de Orden</h2>
+    <h2>Formulario de Orden</h2>
     <!-- FileRequest Embed -->
-
-<div id="filerequestpro" data-url-slug="archivosdicom"
-                                style="margin:auto; min-width: 100px;
-                                height:1075px;"></div>
-                                <script src="https://filerequestpro.com/embedv2.js"></script>
+    <div id="filerequestpro" data-url-slug="archivosdicom"
+      style="margin:auto; min-width: 100px; height:1075px;"></div>
+    <script src="https://filerequestpro.com/embedv2.js"></script>
 
     <label for="stlFileOrden">Archivo STL (opcional):</label>
-      <input
-        type="file"
-        id="stlFileOrden"
-        name="stlFileOrden"
-        accept=".stl"
-      />
-    
-</section>
+    <input type="file" id="stlFileOrden" name="stlFileOrden" accept=".stl" />
+  </section>
 
   <section id="stlviewer">
     <h2>Visor de Modelos STL</h2>
@@ -204,12 +196,12 @@
     </div>
     
     <div class="controls">
-      <button onclick="rotarModelo('x')">Rotar X</button>
-      <button onclick="rotarModelo('y')">Rotar Y</button>
-      <button onclick="rotarModelo('z')">Rotar Z</button>
-      <button onclick="resetCamera()">Reiniciar Vista</button>
-      <button onclick="toggleWireframe()">Mostrar Malla</button>
-      <button onclick="toggleAxes()">Mostrar Ejes</button>
+      <button id="rotateX">Rotar X</button>
+      <button id="rotateY">Rotar Y</button>
+      <button id="rotateZ">Rotar Z</button>
+      <button id="resetCamera">Reiniciar Vista</button>
+      <button id="toggleWireframe">Mostrar Malla</button>
+      <button id="toggleAxes">Mostrar Ejes</button>
     </div>
   </section>
 
@@ -255,11 +247,21 @@
       }
     }
 
+    // Configurar event listeners para los botones de navegación
+    document.querySelectorAll('nav button').forEach(button => {
+      button.addEventListener('click', () => {
+        const sectionId = button.getAttribute('data-section');
+        mostrarSeccion(sectionId);
+      });
+    });
+
     // Inicializar Three.js
     function initThreeJS() {
       // Limpiar escena anterior si existe
-      if (renderer) {
+      if (renderer && renderer.domElement) {
         viewer.removeChild(renderer.domElement);
+      }
+      if (animationId) {
         cancelAnimationFrame(animationId);
       }
       
@@ -334,7 +336,7 @@
       
       // Mostrar información del archivo
       document.getElementById('stlViewerInfo').textContent = 
-        Archivo: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB);
+        `Archivo: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
       
       loadingMessage.textContent = "Cargando modelo...";
       loadingMessage.style.display = 'block';
@@ -425,6 +427,14 @@
       loadingMessage.style.display = 'block';
     }
 
+    // Configurar event listeners para los controles del visor
+    document.getElementById('rotateX').addEventListener('click', () => rotarModelo('x'));
+    document.getElementById('rotateY').addEventListener('click', () => rotarModelo('y'));
+    document.getElementById('rotateZ').addEventListener('click', () => rotarModelo('z'));
+    document.getElementById('resetCamera').addEventListener('click', resetCamera);
+    document.getElementById('toggleWireframe').addEventListener('click', toggleWireframe);
+    document.getElementById('toggleAxes').addEventListener('click', toggleAxes);
+
     // Controles del visor
     function rotarModelo(eje) {
       if (!mesh) return;
@@ -458,11 +468,12 @@
     }
 
     function toggleAxes() {
+      if (!axesHelper) return;
       axesEnabled = !axesEnabled;
       axesHelper.visible = axesEnabled;
     }
 
-    // Eventos para el visor STL
+    // Evento para cargar archivo STL
     document.getElementById('stlFile').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -474,59 +485,13 @@
       }
     });
 
-    // Eventos para el formulario de orden
-    document.getElementById('dicomFiles').addEventListener('change', (e) => {
-      const files = e.target.files;
-      if (files && files.length > 0) {
-        const totalSize = Array.from(files).reduce((sum, file) => sum + file.size, 0);
-        document.getElementById('dicomInfo').textContent = 
-          ${files.length} archivos DICOM seleccionados (${(totalSize / (1024 * 1024)).toFixed(2)} MB);
-      } else {
-        document.getElementById('dicomInfo').textContent = '';
-      }
-    });
-
-    document.getElementById('stlFileOrden').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        document.getElementById('stlInfo').textContent = 
-          `Archivo STL: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
-      } else {
-        document.getElementById('stlInfo').textContent = '';
-      }
-    });
-
-    // Configuración de EmailJS
-    emailjs.init('TU_USER_ID_EMAILJS');
-
-    // Envío del formulario
-    document.getElementById('ordenForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      const formData = new FormData(this);
-      const progressBar = document.querySelector('#uploadProgress .progress-bar');
-      const progressContainer = document.getElementById('uploadProgress');
-      
-      // Simular progreso de carga (en una implementación real usarías XMLHttpRequest con eventos de progreso)
-      progressContainer.style.display = 'block';
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 5;
-        progressBar.style.width = progress + '%';
-        if (progress >= 100) {
-          clearInterval(interval);
-          progressContainer.style.display = 'none';
-          alert('Orden enviada correctamente (simulación)');
-          this.reset();
-          document.getElementById('dicomInfo').textContent = '';
-          document.getElementById('stlInfo').textContent = '';
-        }
-      }, 100);
-    });
-
     // Inicializar al cargar la página
     window.addEventListener('load', () => {
       initThreeJS();
+      
+      // Configurar EmailJS (reemplaza con tu USER_ID real)
+      emailjs.init('TU_USER_ID_EMAILJS');
+      
       // Asegurarse de que la sección de inicio esté activa al principio
       mostrarSeccion('inicio');
     });
